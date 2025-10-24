@@ -99,6 +99,24 @@ class Kepler:
 
         return t,x,v
     
+    def Leapfrog(self):
+        t=self.dt*np.arange(self.T+1)
+        x=np.zeros((self.T+1,2))
+        v=np.zeros((self.T+1,2))
+        x[0,:]=self.x0
+        v[0,:]=self.v0
+
+        a = self.KeplerEquation(x[0,:])
+        v_half = v[0,:] + a*self.dt/2
+
+        for i in range(self.T):
+            x[i+1,:] = x[i,:] + v_half*self.dt
+            a = self.KeplerEquation(x[i+1,:])
+            v_half = v_half + a*self.dt
+            v[i+1,:] = v_half - a*self.dt/2
+
+        return t,x,v
+    
     def RK4(self):
         t=self.dt*np.arange(self.T+1)
         x=np.zeros((self.T+1,2))
