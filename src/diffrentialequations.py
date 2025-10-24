@@ -1,5 +1,5 @@
-#　Euler法によるロジステック方程式の数値解
-import numpy as np                    #数値計算用モジュールを読み込む
+import numpy as np
+pi=np.pi             
 
 class Logistics:
     def __init__(
@@ -19,11 +19,14 @@ class Logistics:
 
     def logistics(self, y: float)->float:
         return self.r*(1-y/self.K)*y
-
+    
     def EulerOneStepForward(self, y: float)->float:
         return self.logistics(y)*self.dt+y
+            
+    def BWEulerOneStepForward(self, y: float)->float:
+        return (self.K/(2*self.r*self.dt))*(-1+self.r*self.dt+np.sqrt( (-1+self.r*self.dt)**2+(4*self.r*self.dt/self.K)* y))
 
-    def solve(self):
+    def Euler(self):
         t=self.dt*np.arange(self.T+1)
         y =self.K/(1+ (self.K/self.y0-1)*np.exp(-self.r*t))
         y2=np.zeros(self.T+1)
@@ -34,7 +37,79 @@ class Logistics:
 
         return t,y,y2
     
+    def BackwardEuler(self):
+        t=self.dt*np.arange(self.T+1)
+        y =self.K/(1+ (self.K/self.y0-1)*np.exp(-self.r*t))
+        y2=np.zeros(self.T+1)
+        y2[0]=self.y0
 
+        for i in range(self.T):
+            y2[i+1]=self.BWEulerOneStepForward(y2[i])
+
+        return t,y,y2
+
+
+class Kepler:
+    def __init__(
+        self,
+        dt = 0.01,
+        tmax = 50,
+        x0=np.array([1,0]),
+        v0=np.array([0,1]),
+    ):
+        self.dt = dt
+        self.tmax = tmax
+        self.x0 = x0
+        self.v0 = v0
+        self.T =int(tmax/dt)
+
+    def KeplerEquation(self,X):    #Xはnumpyの配列(x,y,z)
+        r = np.sqrt(np.sum(X**2))
+        a = -4*pi**2*X/r**3
+        return a
+    
+    def EulerOneStepForward(self,X,V):  #Xはnumpyの配列(x,y,z)
+        a = self.KeplerEquation(X)
+        Xnew = X + V*self.dt
+        Vnew = V + a*self.dt
+        return  Xnew,Vnew
+    
+    def OneStepForward(self,X,V):  #Xはnumpyの配列(x,y,z)
+        k1v = self.KeplerEquation(X)
+        k1x = V
+        k2v = self.KeplerEquation(X + k1x*self.dt/2)
+        k2x = V + k1v*self.dt/2
+        k3v = self.KeplerEquation(X + k2x*self.dt/2)
+        k3x = V + k2v*self.dt/2
+        k4v = self.KeplerEquation(X + k3x*self.dt)
+        k4x = V + k3v*self.dt
+        Xnew =  X + self.dt/6*(k1x + 2*k2x + 2*k3x + k4x)
+        Vnew =  V + self.dt/6*(k1v + 2*k2v + 2*k3v + k4v)
+        return  Xnew,Vnew
+
+    def Euler(self):
+        t=self.dt*np.arange(self.T+1)
+        x=np.zeros((self.T+1,2))
+        v=np.zeros((self.T+1,2))
+        x[0,:]=self.x0
+        v[0,:]=self.v0
+
+        for i in range(self.T):
+            x[i+1,:],v[i+1,:]=self.EulerOneStepForward(x[i,:],v[i,:])
+
+        return t,x,v
+    
+    def RK4(self):
+        t=self.dt*np.arange(self.T+1)
+        x=np.zeros((self.T+1,2))
+        v=np.zeros((self.T+1,2))
+        x[0,:]=self.x0
+        v[0,:]=self.v0
+
+        for i in range(self.T):
+            x[i+1,:],v[i+1,:]=self.OneStepForward(x[i,:],v[i,:])
+
+        return t,x,v
 
 class Lorentz:
     def __init__(
