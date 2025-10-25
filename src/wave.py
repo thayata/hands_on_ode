@@ -54,15 +54,15 @@ class WaveAnimation:
         plt.close(self.fig)
         return HTML(animation.to_jshtml())
     
-    class AdvectionAnimation:
-        def __init__(
+class Advection:
+    def __init__(
             self,
             velocity=1.0,
             x_min=0.0,
             x_max=10.0,
             samples=400,
             dt=None,
-            scheme="upwind",
+            scheme="central",
         ):
             if samples < 2:
                 raise ValueError("samples must be at least 2.")
@@ -91,13 +91,13 @@ class WaveAnimation:
 
             self.set_spatial_scheme(scheme)
 
-        def set_spatial_scheme(self, scheme):
+    def set_spatial_scheme(self, scheme):
             allowed = {"forward", "backward", "central", "upwind"}
             if scheme not in allowed:
                 raise ValueError(f"scheme must be one of {sorted(allowed)}")
             self.scheme = scheme
 
-        def set_initial_condition(self, func):
+    def set_initial_condition(self, func):
             if not callable(func):
                 raise TypeError("initial condition must be callable")
             values = np.asarray(func(self.x), dtype=float)
@@ -110,11 +110,11 @@ class WaveAnimation:
             self.ax.set_ylim(values.min() - pad, values.max() + pad)
             self.line.set_data(self.x, self.u)
 
-        def init_profile(self):
+    def init_profile(self):
             self.line.set_data(self.x, self.u)
             return (self.line,)
 
-        def _compute_gradient(self):
+    def _compute_gradient(self):
             if self.scheme == "forward":
                 return (np.roll(self.u, -1) - self.u) / self.dx
             if self.scheme == "backward":
@@ -125,7 +125,7 @@ class WaveAnimation:
                 return (self.u - np.roll(self.u, 1)) / self.dx
             return (np.roll(self.u, -1) - self.u) / self.dx
 
-        def _step(self):
+    def _step(self):
             if self.c == 0.0:
                 self.time += self.dt
                 return
@@ -133,12 +133,12 @@ class WaveAnimation:
             self.u = self.u - self.c * self.dt * grad
             self.time += self.dt
 
-        def update_profile(self, _):
+    def update_profile(self, _):
             self._step()
             self.line.set_data(self.x, self.u)
             return (self.line,)
 
-        def to_html(self, steps=200, interval=50, repeat=True):
+    def to_html(self, steps=200, interval=50, repeat=True):
             animation = FuncAnimation(
                 self.fig,
                 self.update_profile,
@@ -151,8 +151,8 @@ class WaveAnimation:
             plt.close(self.fig)
             return HTML(animation.to_jshtml())
         
-        class BackwardEulerCentralAdvection:
-            def __init__(self, velocity=1.0, x_min=0.0, x_max=10.0, samples=400, dt=None):
+    class BackwardAdvection:
+        def __init__(self, velocity=1.0, x_min=0.0, x_max=10.0, samples=400, dt=None):
                 if samples < 3:
                     raise ValueError("central difference requires at least three spatial points")
                 self.c = float(velocity)
@@ -170,14 +170,14 @@ class WaveAnimation:
                 ax.set(xlim=self.bounds, ylim=(-1.0, 1.0), xlabel="x", ylabel="u(x, t)", title="Backward Euler (time) with Central Difference (space)")
                 (self.line,) = ax.plot(self.nodes, self.state, color="tab:green", lw=2)
 
-            def _select_dt(self, dt):
+        def _select_dt(self, dt):
                 if dt is not None:
                     return float(dt)
                 if self.c == 0.0:
                     return 0.1 * self.dx
                 return 0.4 * self.dx / abs(self.c)
 
-            def _assemble_operator(self):
+        def _assemble_operator(self):
                 n = self.nodes.size
                 coeff = self.c * self.dt / (2.0 * self.dx)
                 mat = np.eye(n)
@@ -187,7 +187,7 @@ class WaveAnimation:
                 self._system = mat
                 self._advance = np.linalg.inv(mat)
 
-            def set_initial_condition(self, func):
+        def set_initial_condition(self, func):
                 if not callable(func):
                     raise TypeError("initial condition must be callable")
                 data = np.asarray(func(self.nodes), dtype=float)
@@ -202,20 +202,20 @@ class WaveAnimation:
                 self.axes.set_ylim(lower - padding, upper + padding)
                 self.line.set_data(self.nodes, self.state)
 
-            def init_profile(self):
+        def init_profile(self):
                 self.line.set_data(self.nodes, self.state)
                 return (self.line,)
 
-            def _step(self):
+        def _step(self):
                 self.state = self._advance @ self.state
                 self.time += self.dt
 
-            def update_profile(self, _frame=None):
+        def update_profile(self, _frame=None):
                 self._step()
                 self.line.set_data(self.nodes, self.state)
                 return (self.line,)
 
-            def to_html(self, steps=200, interval=50, repeat=True):
+        def to_html(self, steps=200, interval=50, repeat=True):
                 animation = FuncAnimation(
                     self.figure,
                     self.update_profile,
