@@ -92,7 +92,7 @@ class Advection:
             self.set_spatial_scheme(scheme)
 
     def set_spatial_scheme(self, scheme):
-            allowed = {"forward", "backward", "central", "upwind"}
+            allowed = {"forward", "backward", "central"}
             if scheme not in allowed:
                 raise ValueError(f"scheme must be one of {sorted(allowed)}")
             self.scheme = scheme
@@ -121,9 +121,6 @@ class Advection:
                 return (self.u - np.roll(self.u, 1)) / self.dx
             if self.scheme == "central":
                 return (np.roll(self.u, -1) - np.roll(self.u, 1)) / (2.0 * self.dx)
-            if self.c >= 0.0:
-                return (self.u - np.roll(self.u, 1)) / self.dx
-            return (np.roll(self.u, -1) - self.u) / self.dx
 
     def _step(self):
             if self.c == 0.0:
@@ -151,8 +148,8 @@ class Advection:
             plt.close(self.fig)
             return HTML(animation.to_jshtml())
         
-    class BackwardAdvection:
-        def __init__(self, velocity=1.0, x_min=0.0, x_max=10.0, samples=400, dt=None):
+class BackwardAdvection:
+    def __init__(self, velocity=1.0, x_min=0.0, x_max=10.0, samples=400, dt=None, scheme="central"):
                 if samples < 3:
                     raise ValueError("central difference requires at least three spatial points")
                 self.c = float(velocity)
@@ -162,32 +159,53 @@ class Advection:
                 self.dt = self._select_dt(dt)
                 self.state = np.zeros_like(self.nodes)
                 self.time = 0.0
+                self.set_spatial_scheme(scheme)
                 self._assemble_operator()
 
                 fig, ax = plt.subplots()
                 self.figure = fig
                 self.axes = ax
-                ax.set(xlim=self.bounds, ylim=(-1.0, 1.0), xlabel="x", ylabel="u(x, t)", title="Backward Euler (time) with Central Difference (space)")
+                ax.set(xlim=self.bounds, ylim=(-1.0, 1.0), xlabel="x", ylabel="u(x, t)", 
+                      title=f"Backward Euler (time) with {scheme.capitalize()} Difference (space)")
                 (self.line,) = ax.plot(self.nodes, self.state, color="tab:green", lw=2)
 
-        def _select_dt(self, dt):
+    def set_spatial_scheme(self, scheme):
+                allowed = {"forward", "backward", "central"}
+                if scheme not in allowed:
+                    raise ValueError(f"scheme must be one of {sorted(allowed)}")
+                self.scheme = scheme
+
+    def _select_dt(self, dt):
                 if dt is not None:
                     return float(dt)
                 if self.c == 0.0:
                     return 0.1 * self.dx
                 return 0.4 * self.dx / abs(self.c)
 
-        def _assemble_operator(self):
+    def _assemble_operator(self):
                 n = self.nodes.size
-                coeff = self.c * self.dt / (2.0 * self.dx)
-                mat = np.eye(n)
-                idx = np.arange(n)
-                mat[idx, (idx + 1) % n] += coeff
-                mat[idx, (idx - 1) % n] -= coeff
+                if self.scheme == "forward":
+                    coeff = self.c * self.dt / self.dx
+                    mat = np.eye(n)
+                    idx = np.arange(n)
+                    mat[idx, (idx + 1) % n] += coeff
+                    mat[idx, idx] -= coeff
+                elif self.scheme == "backward":
+                    coeff = self.c * self.dt / self.dx
+                    mat = np.eye(n)
+                    idx = np.arange(n)
+                    mat[idx, idx] += coeff
+                    mat[idx, (idx - 1) % n] -= coeff
+                else:  # central
+                    coeff = self.c * self.dt / (2.0 * self.dx)
+                    mat = np.eye(n)
+                    idx = np.arange(n)
+                    mat[idx, (idx + 1) % n] += coeff
+                    mat[idx, (idx - 1) % n] -= coeff
                 self._system = mat
                 self._advance = np.linalg.inv(mat)
 
-        def set_initial_condition(self, func):
+    def set_initial_condition(self, func):
                 if not callable(func):
                     raise TypeError("initial condition must be callable")
                 data = np.asarray(func(self.nodes), dtype=float)
@@ -202,20 +220,20 @@ class Advection:
                 self.axes.set_ylim(lower - padding, upper + padding)
                 self.line.set_data(self.nodes, self.state)
 
-        def init_profile(self):
+    def init_profile(self):
                 self.line.set_data(self.nodes, self.state)
                 return (self.line,)
 
-        def _step(self):
+    def _step(self):
                 self.state = self._advance @ self.state
                 self.time += self.dt
 
-        def update_profile(self, _frame=None):
+    def update_profile(self, _frame=None):
                 self._step()
                 self.line.set_data(self.nodes, self.state)
                 return (self.line,)
 
-        def to_html(self, steps=200, interval=50, repeat=True):
+    def to_html(self, steps=200, interval=50, repeat=True):
                 animation = FuncAnimation(
                     self.figure,
                     self.update_profile,
