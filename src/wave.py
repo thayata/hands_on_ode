@@ -14,6 +14,7 @@ class WaveAnimation:
         self.ax.set_xlim(self.x.min(), self.x.max())
         self.ax.set_ylim(-1.2, 1.2)
         self.ax.set_xlabel("x")
+        #self.ax.axvline(x=5)
         self.ax.set_ylabel("sin(ωt - kx)")
         self.ax.set_title("Propagation of sin(ωt - kx)")
 
@@ -41,7 +42,7 @@ class WaveAnimation:
 
     def to_html(self, interval=50, repeat=True):
         period = 2 * np.pi / self.omega
-        frames = np.linspace(0, 2 * period, 200)
+        frames = np.linspace(0, 2 * period, 400)
         animation = FuncAnimation(
             self.fig,
             self.update_wave,
